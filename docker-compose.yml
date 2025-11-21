@@ -1,0 +1,11 @@
+version: "3"
+services:
+  hadoop-pig:
+    image: suhothayan/hadoop-spark-pig-hive:2.9.2
+    container_name: tarea3_pig
+    volumes:
+      - ./:/root/tarea3
+    stdin_open: true
+    tty: true
+    command:
+      ["/bin/bash", "-c", "service ssh start; while true; do sleep 1000; done"]
