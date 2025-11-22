@@ -1,0 +1,45 @@
+# 1. Iniciar los servicios Docker (Hadoop/Pig)
+docker-compose up -d
+
+# 2. Entrar al contenedor de Pig para interactuar con HDFS
+docker exec -it tarea3_pig bash
+
+# 3. Crear directorios de entrada y salida en HDFS
+hdfs dfs -mkdir -p /input/tarea3
+hdfs dfs -mkdir -p /output/tarea3
+
+# 4. Cargar archivos de entrada a HDFS
+# RUTA DE ORIGEN: /root/tarea3/data/
+# RUTA DE DESTINO EN HDFS: /input/tarea3/
+hdfs dfs -put /root/tarea3/data/llm.txt /input/tarea3/
+hdfs dfs -put /root/tarea3/data/humanos.txt /input/tarea3/
+hdfs dfs -put /root/tarea3/data/stopwords.txt /input/tarea3/
+
+# 5. Verificar que los archivos se hayan cargado
+hdfs dfs -ls /input/tarea3
+
+# 6. Ejecutar el análisis para la fuente HUMANA
+# Asegúrate de que analisis.pig apunte a 'humanos.txt' y 'resultado_humanos'
+pig /root/tarea3/scripts/analisis.pig
+
+# 7. Ejecutar el análisis para la fuente LLM
+# MODIFICAR analisis.pig: Cambiar a 'llm.txt' y 'resultado_llm'
+# Repetir el comando:
+pig /root/tarea3/scripts/analisis.pig
+
+# 8. Verificar la creación de ambas carpetas de salida
+hdfs dfs -ls /output/tarea3
+
+# 9. Descargar la carpeta de resultados del LLM a la máquina local
+# El resultado aparecerá en ./output_llm_final/ en tu máquina local
+hdfs dfs -get /output/tarea3/resultado_llm /root/tarea3/output_llm_final
+
+# 10. Descargar la carpeta de resultados de HUMANOS a la máquina local
+hdfs dfs -get /output/tarea3/resultado_humanos /root/tarea3/output_humanos_final
+
+# 11. Salir del contenedor
+exit
+
+# 12. Detener los servicios Docker (Opcional, pero recomendado)
+# Ejecutar en la terminal de tu máquina local (fuera del contenedor)
+# docker-compose down

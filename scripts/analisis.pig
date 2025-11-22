@@ -1,32 +1,41 @@
-/* scripts/analisis.pig */
+/* scripts/analisis.pig -*/
 
--- ==========================================
--- CONFIGURACIÓN DE ENTRADA
--- Cambia 'humanos.txt' por 'llm.txt' según corresponda ejecutar
--- ==========================================
+--Datos de carga
+
 datos = LOAD '/input/tarea3/llm.txt' AS (linea:chararray);
+STOPWORDS = LOAD '/input/tarea3/stopwords.txt' AS (stopword:chararray);
 
--- 1. TOKENIZACIÓN: Separar frases en palabras
-palabras_raw = FOREACH datos GENERATE FLATTEN(TOKENIZE(linea)) AS palabra;
+-- 1. LIMPIEZA DE PUNTUACIÓN y TOKENIZACIÓN
+-- Eliminamos la mayoría de la puntuación antes de tokenizar para asegurar un mejor conteo
+lineas_limpias = FOREACH datos GENERATE REPLACE(linea, '[^a-zA-Z\\s]', ' ') AS linea_limpia; 
+
+palabras_raw = FOREACH lineas_limpias GENERATE FLATTEN(TOKENIZE(linea_limpia)) AS palabra;
 
 -- 2. LIMPIEZA: Pasar a minúsculas
 palabras_lower = FOREACH palabras_raw GENERATE LOWER(palabra) AS palabra;
 
--- 3. FILTRADO (Stopwords y basura)
--- Filtramos palabras cortas, signos y palabras comunes (stopwords)
-palabras_filtradas = FILTER palabras_lower BY 
-    (SIZE(palabra) > 3) AND 
-    (palabra matches '[a-z]+') AND -- Solo letras, sin numeros
-    (palabra != 'this') AND 
-    (palabra != 'that') AND
-    (palabra != 'have') AND
-    (palabra != 'with') AND
-    (palabra != 'what') AND
-    (palabra != 'the') AND
-    (palabra != 'your') AND
-    (palabra != 'of') AND
-    (palabra != 'contexto') AND -- Palabra que suele aparecer en los dumps
+
+-- 3. FILTRADO (Basura y Stopwords)
+
+-- A. Filtros básicos: aplicar filtros de tamaño y palabras basura de tu dataset
+palabras_limpias_basicas = FILTER palabras_lower BY 
+    (palabra IS NOT NULL) AND
+    (SIZE(palabra) > 1) AND                   
+    (palabra MATCHES '[a-z]+') AND
+    (palabra != 'contexto') AND 
     (palabra != 'respuesta');
+
+-- B. Filtrado por JOIN con Stopwords (Reemplaza tu antiguo paso 3)
+
+-- 3.1 Unir el texto con la lista de stopwords (LEFT OUTER JOIN)
+JOINED_DATA = JOIN palabras_limpias_basicas BY palabra LEFT OUTER, STOPWORDS BY stopword;
+
+-- 3.2 Filtrar las stopwords: Mantenemos solo las palabras (palabras_limpias_basicas::palabra) que NO tuvieron coincidencia.
+CLEAN_TOKENS = FILTER JOINED_DATA BY stopword IS NULL;
+
+-- 3.3 Proyectar la palabra limpia para el conteo (ahora sí se define palabras_filtradas)
+palabras_filtradas = FOREACH CLEAN_TOKENS GENERATE palabras_limpias_basicas::palabra AS palabra;
+
 
 -- 4. CONTEO (MapReduce)
 agrupadas = GROUP palabras_filtradas BY palabra;
@@ -36,6 +45,4 @@ conteo = FOREACH agrupadas GENERATE group AS palabra, COUNT(palabras_filtradas) 
 ordenado = ORDER conteo BY cantidad DESC;
 
 -- 6. GUARDAR RESULTADO
--- Cambia el nombre de la carpeta de salida para no sobrescribir
--- Ejemplo: 'output_humanos' o 'output_llm'
 STORE ordenado INTO '/output/tarea3/resultado_llm';
